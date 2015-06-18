@@ -1,20 +1,20 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 
 namespace Microsoft.Framework.Caching.SqlServer
 {
-    public class CacheItemInfo
+    internal class CacheItem
     {
         public string Id { get; set; }
 
         public byte[] Value { get; set; }
 
-        public DateTime ExpiresAtTime { get; set; }
+        public DateTime ExpirationTimeUTC { get; set; }
 
-        public long? SlidingExpirationInTicks { get; set; }
+        public DateTime? AbsoluteExpirationUTC { get; set; }
 
-        public DateTime? AbsoluteExpiration { get; set; }
+        public TimeSpan? SlidingExpiration { get; set; }
     }
 }

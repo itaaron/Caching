@@ -6,19 +6,37 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Framework.Caching.Distributed;
 using Microsoft.Framework.Caching.SqlServer;
+using Microsoft.Framework.Configuration;
 using Microsoft.Framework.Logging;
+using Microsoft.Framework.OptionsModel;
+using Microsoft.Framework.Runtime;
 
 namespace SqlServerCacheSample
 {
     /// <summary>
     /// This sample requires setting up a Microsoft SQL Server based cache database.
     /// 1. Create a new database or use as existing gone.
-    /// 2. Run the command "dnx . create-sqlservercache <connectionstring-here> <name-of-table-to-be-created>"
+    /// 2. Run the command "dnx . create-sqlservercache <connectionstring-here> <name-of-tableschema-to-be-created> <name-of-table-to-be-created>"
     ///    to setup the table.
     /// </summary>
     public class Program
     {
-        public static async Task Main(string[] args)
+        public Program(IApplicationEnvironment appEnv)
+        {
+            var configurationBuilder = new ConfigurationBuilder(appEnv.ApplicationBasePath);
+            configurationBuilder.AddJsonFile("config.json")
+                        .AddEnvironmentVariables();
+            Configuration = configurationBuilder.Build();
+        }
+
+        public IConfiguration Configuration { get; }
+
+        public void Main()
+        {
+            RunSampleAsync().Wait();
+        }
+
+        public async Task RunSampleAsync()
         {
             var key = Guid.NewGuid().ToString();
             var message = "Hello, World!";
@@ -29,11 +47,13 @@ namespace SqlServerCacheSample
 
             Console.WriteLine("Connecting to cache");
             var cache = new SqlServerCache(
+                new CacheOptions(
                 new SqlServerCacheOptions()
                 {
-                    ConnectionString = "Server=localhost;Database=CacheSampleDb;Trusted_Connection=True;",
-                    TableName = "CacheSample"
-                },
+                    ConnectionString = Configuration.Get("ConnectionString"),
+                    SchemaName = Configuration.Get("SchemaName"),
+                    TableName = Configuration.Get("TableName")
+                }),
                 loggerFactory);
             await cache.ConnectAsync();
 
@@ -78,6 +98,29 @@ namespace SqlServerCacheSample
             }
 
             Console.ReadLine();
+        }
+
+        private class CacheOptions : IOptions<SqlServerCacheOptions>
+        {
+            private readonly SqlServerCacheOptions _innerOptions;
+
+            public CacheOptions(SqlServerCacheOptions innerOptions)
+            {
+                _innerOptions = innerOptions;
+            }
+
+            public SqlServerCacheOptions Options
+            {
+                get
+                {
+                    return _innerOptions;
+                }
+            }
+
+            public SqlServerCacheOptions GetNamedOptions(string name)
+            {
+                return _innerOptions;
+            }
         }
     }
 }

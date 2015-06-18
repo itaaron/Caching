@@ -3,31 +3,105 @@
 
 using System;
 using Microsoft.Framework.Internal;
-using Microsoft.Framework.OptionsModel;
 
 namespace Microsoft.Framework.Caching.SqlServer
 {
-    public class SqlServerCacheOptions : IOptions<SqlServerCacheOptions>
+    public class SqlServerCacheOptions
     {
-        public ISystemClock SystemClock { get; set; } = new SystemClock();
+        private readonly TimeSpan MinimumExpiredItemsDeletionInterval;
+        private TimeSpan _expiredItemsDeletionInterval;
 
-        public TimeSpan ExpirationScanFrequency { get; set; } = TimeSpan.FromMinutes(10);
+        public SqlServerCacheOptions()
+        {
+            MinimumExpiredItemsDeletionInterval = TimeSpan.FromHours(1);
+            _expiredItemsDeletionInterval = MinimumExpiredItemsDeletionInterval;
+        }
 
-        public string ConnectionString { get; set; }
-
-        public string TableName { get; set; }
-
-        public SqlServerCacheOptions Options
+        private ISystemClock _systemClock = new SystemClock();
+        public ISystemClock SystemClock
         {
             get
             {
-                return this;
+                return _systemClock;
+            }
+            [param: NotNull]
+            set
+            {
+                _systemClock = value;
             }
         }
 
-        public SqlServerCacheOptions GetNamedOptions(string name)
+        public TimeSpan ExpiredItemsDeletionInterval
         {
-            return this;
+            get
+            {
+                return _expiredItemsDeletionInterval;
+            }
+            set
+            {
+                if (value < MinimumExpiredItemsDeletionInterval)
+                {
+                    throw new ArgumentException(
+                        $"{ExpiredItemsDeletionInterval} cannot be less the minimum value of " +
+                        $"{MinimumExpiredItemsDeletionInterval.TotalMinutes} minutes.");
+                }
+
+                _expiredItemsDeletionInterval = value;
+            }
+        }
+
+        private string _connectionString;
+        public string ConnectionString
+        {
+            get
+            {
+                return _connectionString;
+            }
+            set
+            {
+                if (string.IsNullOrEmpty(value))
+                {
+                    throw new ArgumentException($"{nameof(ConnectionString)} cannot be empty or null.");
+                }
+
+                _connectionString = value;
+            }
+        }
+
+        private string _schemaName;
+        public string SchemaName
+        {
+            get
+            {
+                return _schemaName;
+            }
+            set
+            {
+                if (string.IsNullOrEmpty(value))
+                {
+                    throw new ArgumentException($"{nameof(SchemaName)} cannot be empty or null.");
+                }
+
+                _schemaName = value;
+            }
+        }
+
+        private string _tableName;
+        public string TableName
+        {
+            get
+            {
+                return _tableName;
+            }
+            set
+            {
+                if (string.IsNullOrEmpty(value))
+                {
+                    throw new ArgumentException($"{nameof(TableName)} cannot be empty or null.");
+                }
+
+                _tableName = value;
+            }
         }
     }
 }

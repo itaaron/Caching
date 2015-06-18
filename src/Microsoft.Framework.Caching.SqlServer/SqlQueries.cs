@@ -5,70 +5,81 @@ namespace Microsoft.Framework.Caching.SqlServer
 {
     internal class SqlQueries
     {
-        private const string CreateTableFormat = "CREATE TABLE [{0}](" +
+        private const string CreateTableFormat = "CREATE TABLE {0}(" +
             "Id nvarchar(100)  NOT NULL PRIMARY KEY, " +
             "Value varbinary(MAX) NOT NULL, " +
-            "ExpiresAtTimeUTC datetimeoffset NOT NULL, " +
+            "ExpiresAtTimeUTC datetime NOT NULL, " +
             "SlidingExpirationInTicks bigint NULL," +
-            "AbsoluteExpiration datetimeoffset NULL)";
+            "AbsoluteExpirationUTC datetime NULL)";
 
         private const string CreateNonClusteredIndexOnExpirationTimeFormat
-            = "CREATE NONCLUSTERED INDEX Index_ExpiresAtTimeUTC ON [{0}](ExpiresAtTimeUTC)";
+            = "CREATE NONCLUSTERED INDEX Index_ExpiresAtTimeUTC ON {0}(ExpiresAtTimeUTC)";
 
-        // Used for getting table schema when trying to 'Connect' to the database
-        private const string GetTableSchemaFormat = "SELECT * FROM [{0}]";
+        private const string TableInfoFormat =
+            "SELECT TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE " +
+            "FROM INFORMATION_SCHEMA.TABLES " +
+            "WHERE TABLE_SCHEMA = '{0}' " +
+            "AND TABLE_NAME = '{1}'";
 
         private const string GetCacheItemFormat =
-            "SELECT Id, Value, ExpiresAtTimeUTC, SlidingExpirationInTicks, AbsoluteExpiration " +
-            "FROM [{0}] WHERE Id = @Id AND @UtcNow <= ExpiresAtTimeUTC";
+            "SELECT Id, Value, ExpiresAtTimeUTC, SlidingExpirationInTicks, AbsoluteExpirationUTC " +
+            "FROM {0} WHERE Id = @Id AND @UtcNow <= ExpiresAtTimeUTC";
 
-        private const string AddCacheItemFormat = "INSERT INTO [{0}] " +
-            "(Id, Value, ExpiresAtTimeUTC, SlidingExpirationInTicks, AbsoluteExpiration) " +
-            "VALUES (@Id, @Value, @ExpiresAtTimeUTC, @SlidingExpirationInTicks, @AbsoluteExpiration)";
+        private const string SetCacheItemFormat =
+            "BEGIN " +
+                "IF NOT EXISTS(SELECT Id FROM {0} WHERE Id = @Id) " +
+                "BEGIN " +
+                    "INSERT INTO {0} " +
+                        "(Id, Value, ExpiresAtTimeUTC, SlidingExpirationInTicks, AbsoluteExpirationUTC) " +
+                        "VALUES (@Id, @Value, @ExpiresAtTimeUTC, @SlidingExpirationInTicks, @AbsoluteExpirationUTC) " +
+                "END " +
+                "ELSE " +
+                "BEGIN " +
+                    "UPDATE {0} SET Value = @Value, ExpiresAtTimeUTC = @ExpiresAtTimeUTC " +
+                    "WHERE Id = @Id " +
+                "END " +
+            "END";
 
-        private const string UpdateCacheItemFormat = "UPDATE [{0}] SET Value = @Value, " +
-            "ExpiresAtTimeUTC = @ExpiresAtTimeUTC  WHERE Id = @Id";
+        private const string DeleteCacheItemFormat = "DELETE FROM {0} WHERE Id = @Id";
 
-        private const string DeleteCacheItemFormat = "DELETE FROM [{0}] WHERE Id = @Id";
-
-        private const string UpdateCacheItemExpirationFormat = "UPDATE [{0}] SET ExpiresAtTimeUTC = @ExpiresAtTimeUTC " +
+        private const string UpdateCacheItemExpirationFormat = "UPDATE {0} SET ExpiresAtTimeUTC = @ExpiresAtTimeUTC " +
             "WHERE Id = @Id";
 
-        public const string DeleteExpiredCacheItemsFormat = "DELETE FROM [{0}] WHERE @UtcNow > ExpiresAtTimeUTC";
+        public const string DeleteExpiredCacheItemsFormat = "DELETE FROM {0} WHERE @UtcNow > ExpiresAtTimeUTC";
 
-        public SqlQueries(string tableName)
+        public SqlQueries(string schemaName, string tableName)
         {
-            //TODO: error checks
+            //TODO: sanitize schema and table name
 
-            CreateTable = string.Format(CreateTableFormat, tableName);
+            var tableNameWithSchema = string.Format("[{0}].[{1}]", schemaName, tableName);
+            CreateTable = string.Format(CreateTableFormat, tableNameWithSchema);
             CreateNonClusteredIndexOnExpirationTime = string.Format(
                 CreateNonClusteredIndexOnExpirationTimeFormat,
-                tableName);
-            GetTableSchema = string.Format(GetTableSchemaFormat, tableName);
-            GetCacheItem = string.Format(GetCacheItemFormat, tableName);
-            AddCacheItem = string.Format(AddCacheItemFormat, tableName);
-            UpdateCacheItem = string.Format(UpdateCacheItemFormat, tableName);
-            DeleteCacheItem = string.Format(DeleteCacheItemFormat, tableName);
-            UpdateCacheItemExpiration = string.Format(UpdateCacheItemExpirationFormat, tableName);
-            DeleteExpiredCacheItems = string.Format(DeleteExpiredCacheItemsFormat, tableName);
+                tableNameWithSchema);
+            TableInfo = string.Format(TableInfoFormat, schemaName, tableName);
+            GetCacheItem = string.Format(GetCacheItemFormat, tableNameWithSchema);
+            DeleteCacheItem = string.Format(DeleteCacheItemFormat, tableNameWithSchema);
+            UpdateCacheItemExpiration = string.Format(UpdateCacheItemExpirationFormat, tableNameWithSchema);
+            DeleteExpiredCacheItems = string.Format(DeleteExpiredCacheItemsFormat, tableNameWithSchema);
+            SetCacheItem = string.Format(SetCacheItemFormat, tableNameWithSchema);
         }
 
-        public string CreateTable { get; }
+        public virtual string CreateTable { get; }
 
-        public string CreateNonClusteredIndexOnExpirationTime { get; }
+        public virtual string CreateNonClusteredIndexOnExpirationTime { get; }
 
-        public string GetTableSchema { get; }
+        public virtual string GetTableSchema { get; }
 
-        public string GetCacheItem { get; }
+        public virtual string TableInfo { get; }
 
-        public string AddCacheItem { get; }
+        public virtual string GetCacheItem { get; }
 
-        public string UpdateCacheItem { get; }
+        public virtual string SetCacheItem { get; }
 
-        public string DeleteCacheItem { get; }
+        public virtual string DeleteCacheItem { get; }
 
-        public string UpdateCacheItemExpiration { get; }
+        public virtual string UpdateCacheItemExpiration { get; }
 
-        public string DeleteExpiredCacheItems { get; }
+        public virtual string DeleteExpiredCacheItems { get; }
     }
 }

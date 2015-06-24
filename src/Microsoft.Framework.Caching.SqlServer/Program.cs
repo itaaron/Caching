@@ -5,81 +5,94 @@ using System;
 using System.Data;
 using System.Data.SqlClient;
 using Microsoft.Framework.Logging;
+using Microsoft.Framework.Runtime.Common.CommandLine;
 
 namespace Microsoft.Framework.Caching.SqlServer
 {
     public class Program
     {
-        private string _connectionString;
-        private string _schemaName;
-        private string _tableName;
+        private string _connectionString = null;
+        private string _schemaName = null;
+        private string _tableName = null;
 
         private readonly ILogger _logger;
 
         public Program()
         {
+            // TODO: use CommandOutputLogger?
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddConsole();
             _logger = loggerFactory.CreateLogger<Program>();
+
+            var app = new CommandLineApplication();
+            app.Name = "sqlservercache";
+            app.Description = "Creates tables and indexes in Microsoft SQL Server to be used for distributed caching.";
+
+            app.HelpOption("-?|-h|--help");
+            var optVerbose = app.Option("-v|--verbose", "Verbose output", CommandOptionType.NoValue);
         }
 
-        public void Main(string[] args)
+        public int Main(string[] args)
         {
-            SwitchType switchType = SwitchType.None;
-            for (var i = 0; i < args.Length; i++)
+            try
             {
-                if (switchType != SwitchType.None)
+                var app = new CommandLineApplication();
+                app.Name = "sqlservercache";
+                app.Description = "Creates table and indexes in Microsoft SQL Server database " +
+                    "to be used for distributed caching";
+
+                app.HelpOption("-?|-h|--help");
+                var optVerbose = app.Option("-v|--verbose", "Verbose output", CommandOptionType.NoValue);
+
+                app.Command("create", command =>
                 {
-                    switch (switchType)
+                    command.Description = "Creates table and indexes in Microsoft SQL Server database " +
+                    "to be used for distributed caching";
+
+                    var connectionStringArg = command.Argument(
+                        "[connectionString]",
+                        "The connection string to connect to the database.");
+                    var schemaNameArg = command.Argument("[schemaName]", "Name of the table schema.");
+                    var tableNameArg = command.Argument("[tableName]", "Name of the table to be created.");
+                    command.HelpOption("-?|-h|--help");
+
+                    command.OnExecute(() =>
                     {
-                        case SwitchType.ConnectionString:
-                            _connectionString = args[i];
-                            break;
-                        case SwitchType.SchemaName:
-                            _schemaName = args[i];
-                            break;
-                        case SwitchType.TableName:
-                            _tableName = args[i];
-                            break;
-                    }
+                        if (string.IsNullOrEmpty(connectionStringArg.Value)
+                        || string.IsNullOrEmpty(schemaNameArg.Value)
+                        || string.IsNullOrEmpty(tableNameArg.Value))
+                        {
+                            _logger.LogWarning("Invalid input.");
+                            app.ShowHelp();
+                            return 2;
+                        }
 
-                    switchType = SwitchType.None;
-                    continue;
-                }
+                        _connectionString = connectionStringArg.Value;
+                        _schemaName = schemaNameArg.Value;
+                        _tableName = tableNameArg.Value;
 
-                switch (args[i].ToLower())
+                        CreateTableAndIndexes();
+
+                        _logger.LogInformation("Table and index were created successfully.");
+
+                        return 0;
+                    });
+                });
+
+                // Show help information if no subcommand/option was specified.
+                app.OnExecute(() =>
                 {
-                    case "--connectionstring":
-                    case "--cs":
-                        switchType = SwitchType.ConnectionString;
-                        break;
-                    case "--schemaname":
-                    case "--sn":
-                        switchType = SwitchType.SchemaName;
-                        break;
-                    case "--tablename":
-                    case "--tn":
-                        switchType = SwitchType.TableName;
-                        break;
-                }
-            }
+                    app.ShowHelp();
+                    return 2;
+                });
 
-            if (string.IsNullOrEmpty(_connectionString)
-                || string.IsNullOrEmpty(_schemaName)
-                || string.IsNullOrEmpty(_tableName))
+                return app.Execute(args);
+            }
+            catch (Exception exception)
             {
-                Console.WriteLine("Invalid input.");
-                ShowHelp();
-                return;
+                _logger.LogCritical("An error occurred. {Message}", exception.Message);
+                return 1;
             }
-
-            CreateTableAndIndexes();
-        }
-
-        private void ShowHelp()
-        {
-            Console.WriteLine("Example usage: dnx . create-sqlservercache --connectionString|--cs <connectionstring> " +
-                "--schemaName|--sn <schemaname> --tabeName|--tn <tablename> ");
         }
 
         private void CreateTableAndIndexes()
@@ -123,14 +136,6 @@ namespace Microsoft.Framework.Caching.SqlServer
                     }
                 }
             }
-        }
-
-        private enum SwitchType
-        {
-            None,
-            ConnectionString,
-            SchemaName,
-            TableName
         }
     }
 }

@@ -1,6 +1,6 @@
 {
     "commands": {
-        "create-sqlservercache": "Microsoft.Framework.Caching.SqlServer"
+        "sqlservercache": "Microsoft.Framework.Caching.SqlServer"
     },
     "dependencies": {
         "Microsoft.Framework.Caching.Abstractions": "1.0.0-*",
@@ -8,6 +8,7 @@
         "Microsoft.Framework.Logging.Abstractions": "1.0.0-*",
         "Microsoft.Framework.Logging.Console": "1.0.0-*",
         "Microsoft.Framework.NotNullAttribute.Sources": { "type": "build", "version": "1.0.0-*" },
+        "Microsoft.Framework.CommandLineUtils.Sources": { "version": "1.0.0-*", "type": "build" },
         "Microsoft.Framework.OptionsModel": "1.0.0-*"
     },
     "description": "ASP.NET 5 distributed cache implementation on Microsoft SQL Server.",
